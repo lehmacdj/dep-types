@@ -95,11 +95,11 @@ assertEq s t
 
 -- (f : (πx:Type.x)) Bool
 
-substitute' :: Name -> Term -> Term -> Term
+substitute' :: Name -> Term -> Term -> Either String Term
 substitute' = ((nf.).) . substitute
 
 typeOf' :: Env -> Term -> Either String Term
-typeOf' = (fmap nf .) .  typeOf
+typeOf' = ((>>= nf) .) .  typeOf
 
 typeOf :: Env -> Term -> Either String Term
 typeOf g Unit = Right UnitTy
@@ -122,7 +122,7 @@ typeOf g (App s t) = do
     case s' of
         Pi x x' r' -> do
             assertEq x' t'
-            Right $ substitute' x t r'
+            substitute' x t r'
         _ -> Left $ "type of " ++ show t ++ " was "
                  ++ show t' ++ " but was expected to be a function type"
 typeOf g (Pi x x' e) = do
@@ -138,26 +138,38 @@ typeOf g (Lam x x' e) = do
     Right $ Pi x x' e'
 typeOf g (V x 0) = getFromEnv g x
 
-nf :: Term -> Term
-nf Unit = Unit
-nf T = T
-nf F = F
-nf Void = Void
-nf UnitTy = UnitTy
-nf Bool = Bool
-nf (TypeUniverse n) = TypeUniverse n
-nf (IF p t e) = case nf p of
-    T -> nf t
-    F -> nf e
-nf (App f a) = case whnf f of
-    Lam x x' e -> nf $ substitute x a e
-    _ -> error "invalid function application"
-nf (Lam x x' e) = Lam x (nf x') (nf e)
-nf (Pi x x' e) = Pi x (nf x') (nf e)
-nf (V x i) = V x i
+nf :: Term -> Either String Term
+nf Unit = pure Unit
+nf T = pure T
+nf F = pure F
+nf Void = pure Void
+nf UnitTy = pure UnitTy
+nf Bool = pure Bool
+nf (TypeUniverse n) = pure $ TypeUniverse n
+nf (IF p t e) = do
+    p' <- nf p
+    case p' of
+        T -> nf t
+        F -> nf e
+nf (App f a) = do
+    f' <- whnf f
+    case f' of
+        Lam x x' e -> nf $ substitute x a e
+        _ -> error "invalid function application"
+nf (Lam x x' e) = do
+    x'' <- nf x'
+    e' <- nf e
+    pure $ Lam x x'' e'
+nf (Pi x x' e) = do
+    x'' <- nf x'
+    e' <- nf e
+    pure $ Pi x x'' e'
+nf (V x i) = pure $ V x i
 
-whnf :: Term -> Term
-whnf (App f a) = case whnf f of
-    Lam x x' e -> whnf $ substitute x a e
-    _ -> error "invalid function application"
-whnf t = t
+whnf :: Term -> Either String Term
+whnf (App f a) = do
+    f' <- whnf f
+    case f' of
+        Lam x x' e -> whnf $ substitute x a e
+        _ -> error "invalid function application"
+whnf t = pure t
