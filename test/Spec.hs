@@ -2,6 +2,7 @@
 
 import Lang.Dependent.AST
 import Lang.Common.Variable
+import Data.Either (isLeft, isRight)
 
 import Test.Tasty
 import Test.Tasty.QuickCheck
@@ -13,9 +14,12 @@ main = defaultMain properties
 
 properties :: TestTree
 properties = testGroup "QuickCheck property tests"
-    [testProperty "substitution" $
+    [ testProperty "substitution" $
         \(x :: Name) (t :: Term) ->
             x `notElem` freeVars t ==> substitute x t t == t
+    , testProperty "well typed term doesn't fail reduction" $
+        \(t :: Term) ->
+            isRight (typeCheck t) ==> isRight (nf t)
     ]
 
 instance Arbitrary Term where

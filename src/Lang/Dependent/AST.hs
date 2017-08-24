@@ -137,6 +137,12 @@ typeOf g (Lam x x' e) = do
     e' <- typeOf' (extendedWith (x, x') g) e
     Right $ Pi x x' e'
 typeOf g (V x 0) = getFromEnv g x
+-- TODO: the correct way to handle this is to save all past values in the
+-- environment and skip n of them where n is the index for the variable
+typeOf g (V x n) = Left "invalid type for variable assignment"
+
+typeCheck :: Term -> Either String Term
+typeCheck = typeOf M.empty
 
 nf :: Term -> Either String Term
 nf Unit = pure Unit
