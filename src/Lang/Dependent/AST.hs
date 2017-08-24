@@ -72,10 +72,11 @@ instance Substitutable Name Term Term where
 type Env = Map (Name, Int) Term
 
 mapVarIndex :: (Int -> Int) -> Name -> Term -> Term
-mapVarIndex f x (V y i)
-  | x == y = V y (f i)
-  | otherwise = V y i
-mapVarIndex f x t = transform (mapVarIndex f x) t
+mapVarIndex f x = transform go
+    where go (V y i)
+            | x == y = V y $ f i
+            | otherwise = V y i
+          go t = t
 
 getFromEnv :: Env -> (Name, Int) -> Either String Term
 getFromEnv env a = maybe (Left err) Right (M.lookup a env) where
