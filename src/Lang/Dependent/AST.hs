@@ -10,9 +10,7 @@ import Control.Monad.Reader
 
 import Control.Lens
 import Control.Lens.Plated
-import Data.Map (Map)
 import Data.List ((\\))
-import qualified Data.Map as M
 import Data.Data hiding (typeOf)
 
 import Data.Semigroup
@@ -71,8 +69,6 @@ instance Substitutable Name Term Term where
         where rep' = incrVar x rep
     substitute x rep t = over plate (substitute x rep) t
 
-type Env = Map Name Term
-
 mapVarIndex :: (Int -> Int) -> Name -> Term -> Term
 mapVarIndex f x = transform go
     where go (V y i)
@@ -80,12 +76,22 @@ mapVarIndex f x = transform go
             | otherwise = V y i
           go t = t
 
+type Env = [(Name, Term)]
+
+getFromEnvSkip :: Env -> Name -> Int -> Either String Term
+getFromEnvSkip [] x 0 = Left $ show x ++ " is not present in the type environment"
+getFromEnvSkip [] x n = Left $ "Missing " ++ show n ++ " bindings for " ++ show x
+getFromEnvSkip ((x, t):bs) y i
+  | x == y && i == 0 = Right t
+  | x == y = getFromEnvSkip bs y (i - 1)
+  | otherwise = getFromEnvSkip bs y i
+
 getFromEnv :: Env -> Name -> Either String Term
-getFromEnv env x = maybe (Left err) Right (M.lookup x env) where
+getFromEnv env x = maybe (Left err) Right (lookup x env) where
     err = show x ++ " is not present in the type environment"
 
 extendedWith :: (Name, Term) -> Env -> Env
-extendedWith (k, v) = M.insert k v
+extendedWith = (:)
 
 -- assert that two terms are equal, for example: during type checking
 assertEq :: Term -> Term -> Either String ()
@@ -134,15 +140,13 @@ typeOf g (Pi x x' e) = do
         _ -> Left $ "function arguments and return types must be types"
                  ++ "and cannot be values"
 typeOf g (Lam x x' e) = do
-    e' <- typeOf' (extendedWith (x, x') g) e
+    x'' <- nf x'
+    e' <- typeOf' (extendedWith (x, x'') g) e
     Right $ Pi x x' e'
-typeOf g (V x 0) = getFromEnv g x
--- TODO: the correct way to handle this is to save all past values in the
--- environment and skip n of them where n is the index for the variable
-typeOf g (V x n) = Left "invalid type for variable assignment"
+typeOf g (V x n) = getFromEnvSkip g x n
 
 typeCheck :: Term -> Either String Term
-typeCheck = typeOf M.empty
+typeCheck = typeOf []
 
 nf :: Term -> Either String Term
 nf Unit = pure Unit
@@ -157,11 +161,12 @@ nf (IF p t e) = do
     case p' of
         T -> nf t
         F -> nf e
+        _ -> Left $ "invalid argument " ++ show p ++ " to boolean destructor"
 nf (App f a) = do
     f' <- whnf f
     case f' of
         Lam x x' e -> nf $ substitute x a e
-        _ -> error "invalid function application"
+        _ -> Left "invalid function application"
 nf (Lam x x' e) = do
     x'' <- nf x'
     e' <- nf e
@@ -177,5 +182,5 @@ whnf (App f a) = do
     f' <- whnf f
     case f' of
         Lam x x' e -> whnf $ substitute x a e
-        _ -> error "invalid function application"
+        _ -> Left "invalid function application"
 whnf t = pure t
