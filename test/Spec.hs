@@ -39,3 +39,16 @@ aterm n = oneof
     , liftA2 App t t
     ]
         where t = aterm (n `div` 2)
+
+newtype WellTyped = WellTyped Term
+
+infixr 8 <.>
+(<.>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
+(<.>) = fmap . fmap
+
+instance Arbitrary WellTyped where
+    arbitrary = sized (WellTyped . fst <.> tyterm)
+
+tyterm :: Int -> Gen (Term, Term)
+tyterm 0 = undefined
+tyterm n = undefined
