@@ -137,8 +137,8 @@ typeOf g (Pi x x' e) = do
         -- this may not be particualarly sound. See this for more details:
         -- https://cs.stackexchange.com/questions/13285/universes-in-dependent-type-theory
         (TypeUniverse i, TypeUniverse j) -> Right $ TypeUniverse $ max i j
-        _ -> Left $ "function arguments and return types must be types"
-                 ++ "and cannot be values"
+        _ -> Left $ "function function argument types and return types must be"
+                 ++ " types and cannot be values"
 typeOf g (Lam x x' e) = do
     x'' <- nf x'
     e' <- typeOf' (extendedWith (x, x'') g) e
