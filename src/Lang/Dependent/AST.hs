@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Lang.Dependent.AST where
 
@@ -12,6 +13,7 @@ import Control.Lens
 import Control.Lens.Plated
 import Data.List ((\\))
 import Data.Data hiding (typeOf)
+import Data.String (fromString, IsString)
 
 import Data.Semigroup
 
@@ -19,19 +21,34 @@ import Lang.Common.Variable
 
 import Control.Applicative
 
-type Name = String
+data Name = N String
+          | AnyN -- this is a wild card name and should only occur in the
+                 -- argument of types or lambdas to indicate that the variable
+                 -- is not used anywhere within the expression it binds
+  deriving (Show, Read, Data, Typeable)
+
+instance Eq Name where
+  AnyN == _ = True
+  _ == AnyN = True
+  N s == N t = s == t
+
+instance IsString Name where
+  fromString = N
 
 data Term = V Name Int
           | Lam Name Term Term
           | Pi Name Term Term
           | App Term Term
-          | Void
+          | Void | Absurd Term
           | Unit | UnitTy
           | T | F | Bool | IF Term Term Term
           | TypeUniverse Natural
           deriving (Eq, Show, Read, Data, Typeable)
 
 instance Plated Term
+
+instance IsString Term where
+  fromString s = V (fromString s) 0
 
 instance VarContaining Term Name where
     freeVars t = fst <$> (freeVars t :: [(Name, Int)])
@@ -91,7 +108,9 @@ getFromEnv env x = maybe (Left err) Right (lookup x env) where
     err = show x ++ " is not present in the type environment"
 
 extendedWith :: (Name, Term) -> Env -> Env
-extendedWith = (:)
+extendedWith (AnyN, t) = id -- don't add AnyN to the environment because that
+                            -- would be chaotic for type checking
+extendedWith (x, t) = ((x, t):)
 
 -- assert that two terms are equal, for example: during type checking
 assertEq :: Term -> Term -> Either String ()
@@ -112,6 +131,7 @@ typeOf g Unit = Right UnitTy
 typeOf g T = Right Bool
 typeOf g F = Right Bool
 typeOf g Void = Right $ TypeUniverse 0
+typeOf g (Absurd ty) = Right $ Pi "x" Void ty
 typeOf g UnitTy = Right $ TypeUniverse 0
 typeOf g Bool = Right $ TypeUniverse 0
 typeOf g (TypeUniverse n) = Right $ TypeUniverse $ n + 1
@@ -153,6 +173,7 @@ nf Unit = pure Unit
 nf T = pure T
 nf F = pure F
 nf Void = pure Void
+nf (Absurd ty) = pure (Absurd ty)
 nf UnitTy = pure UnitTy
 nf Bool = pure Bool
 nf (TypeUniverse n) = pure $ TypeUniverse n
@@ -166,6 +187,7 @@ nf (App f a) = do
     f' <- whnf f
     case f' of
         Lam x x' e -> nf $ substitute x a e
+        Absurd ty -> Left "trying to evaluate an expression that uses Absurd?"
         _ -> Left "invalid function application"
 nf (Lam x x' e) = do
     x'' <- nf x'
@@ -182,5 +204,6 @@ whnf (App f a) = do
     f' <- whnf f
     case f' of
         Lam x x' e -> whnf $ substitute x a e
+        Absurd ty -> Left "trying to evaluate an expression that uses Absurd?"
         _ -> Left "invalid function application"
 whnf t = pure t
