@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Lang.Dependent.AST where
 
@@ -18,11 +19,12 @@ import Data.String (fromString, IsString)
 import Data.Semigroup
 
 import Lang.Common.Variable
+import Lang.Common.Unique
 
 import Control.Applicative
 
 newtype Name = N String
-  deriving (Eq, Show, Read, Data, Typeable)
+  deriving (Eq, Show, Read, Data, Typeable, Uniquable)
 
 instance IsString Name where
   fromString = N
@@ -46,8 +48,18 @@ instance VarContaining Term Name where
     freeVars t = fst <$> (freeVars t :: [(Name, Int)])
     allVars t = fst <$> (allVars t :: [(Name, Int)])
 
+overBound :: Term -> Unique Name Term
+overBound = undefined
+
 overName :: Name -> (a -> a) -> [(Name, a)] -> [(Name, a)]
 overName n = over (mapped . filtered ((==n) . fst) . _2)
+
+mapVarIndex :: (Int -> Int) -> Name -> Term -> Term
+mapVarIndex f x = transform go
+    where go (V y i)
+            | x == y = V y $ f i
+            | otherwise = V y i
+          go t = t
 
 decrVar :: Name -> Term -> Term
 decrVar = mapVarIndex pred
@@ -78,13 +90,6 @@ instance Substitutable Name Term Term where
         where rep' = incrVar x rep
     substitute x rep t = over plate (substitute x rep) t
 
-mapVarIndex :: (Int -> Int) -> Name -> Term -> Term
-mapVarIndex f x = transform go
-    where go (V y i)
-            | x == y = V y $ f i
-            | otherwise = V y i
-          go t = t
-
 type Env = [(Name, Term)]
 
 getFromEnvSkip :: Env -> Name -> Int -> Either String Term
@@ -100,17 +105,13 @@ getFromEnv env x = maybe (Left err) Right (lookup x env) where
     err = show x ++ " is not present in the type environment"
 
 extendedWith :: (Name, Term) -> Env -> Env
-extendedWith (AnyN, t) = id -- don't add AnyN to the environment because that
-                            -- would be chaotic for type checking
-extendedWith (x, t) = ((x, t):)
+extendedWith = (:)
 
 -- assert that two terms are equal, for example: during type checking
 assertEq :: Term -> Term -> Either String ()
 assertEq s t
   | s == t = pure ()
   | otherwise = Left $ "term " ++ show s ++ " is not equal to " ++ show t
-
--- (f : (πx:Type.x)) Bool
 
 substitute' :: Name -> Term -> Term -> Either String Term
 substitute' = ((nf.).) . substitute
