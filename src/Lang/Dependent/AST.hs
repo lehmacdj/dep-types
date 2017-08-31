@@ -21,16 +21,8 @@ import Lang.Common.Variable
 
 import Control.Applicative
 
-data Name = N String
-          | AnyN -- this is a wild card name and should only occur in the
-                 -- argument of types or lambdas to indicate that the variable
-                 -- is not used anywhere within the expression it binds
-  deriving (Show, Read, Data, Typeable)
-
-instance Eq Name where
-  AnyN == _ = True
-  _ == AnyN = True
-  N s == N t = s == t
+newtype Name = N String
+  deriving (Eq, Show, Read, Data, Typeable)
 
 instance IsString Name where
   fromString = N

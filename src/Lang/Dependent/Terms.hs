@@ -9,7 +9,7 @@ import Lang.Dependent.AST
 infixr 5 ~>
 
 (~>) :: Term -> Term -> Term
-(~>) = Pi AnyN
+(~>) = Pi "_"
 
 infixl 5 @@
 
@@ -74,6 +74,5 @@ inr = Lam "a" ty $ Lam "b" ty $ Lam "y" "a" $
 
 match = Lam "a" ty $ Lam "b" ty $ Lam "s" (sumTy @@ "a" @@ "b") $ Lam "c" ty $
   Lam "f" ("a" ~> "c") $ Lam "g" ("b" ~> "c") $ "s" @@ "c" @@ "f" @@ "g"
-
 
 -- primitive recursion
