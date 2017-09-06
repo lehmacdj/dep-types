@@ -30,6 +30,13 @@ voidTy = Pi "a" ty "a"
 absurd = Lam "a" ty $ Lam "x" voidTy $ "x" @@ "a"
 
 
+-- unit
+
+unitTy = Pi "a" ty $ "a" ~> "a"
+
+unit = Lam "a" ty $ Lam "x" "a" "x"
+
+
 -- booleans
 
 boolTy = Pi "a" ty $ "a" ~> "a" ~> "a"
@@ -76,3 +83,10 @@ match = Lam "a" ty $ Lam "b" ty $ Lam "s" (sumTy @@ "a" @@ "b") $ Lam "c" ty $
   Lam "f" ("a" ~> "c") $ Lam "g" ("b" ~> "c") $ "s" @@ "c" @@ "f" @@ "g"
 
 -- primitive recursion
+
+natTy = Pi "a" ty $ Pi "f" ("a" ~> "a") $ Pi "x" "a" "a"
+
+zero = Lam "a" ty $ Lam "f" ("a" ~> "a") $ Lam "x" "a" "x"
+
+succ = Lam "n" natTy $ Lam "a" ty $ Lam "f" ("a" ~> "a") $ Lam "x" "a" $
+  "f" @@ ("n" @@ "a" @@ "f" @@ "x")
