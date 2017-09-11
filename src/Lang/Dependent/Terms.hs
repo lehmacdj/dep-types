@@ -76,7 +76,7 @@ sumTy = Lam "a" ty $ Lam "b" ty $ Pi "c" ty $
 inl = Lam "a" ty $ Lam "b" ty $ Lam "x" "a" $
   Lam "c" ty $ Lam "f" ("a" ~> "c") $ Lam "g" ("b" ~> "c") $ "f" @@ "x"
 
-inr = Lam "a" ty $ Lam "b" ty $ Lam "y" "a" $
+inr = Lam "a" ty $ Lam "b" ty $ Lam "y" "b" $
   Lam "c" ty $ Lam "f" ("a" ~> "c") $ Lam "g" ("b" ~> "c") $ "g" @@ "y"
 
 match = Lam "a" ty $ Lam "b" ty $ Lam "s" (sumTy @@ "a" @@ "b") $ Lam "c" ty $
@@ -84,7 +84,7 @@ match = Lam "a" ty $ Lam "b" ty $ Lam "s" (sumTy @@ "a" @@ "b") $ Lam "c" ty $
 
 -- primitive recursion
 
-natTy = Pi "a" ty $ Pi "f" ("a" ~> "a") $ Pi "x" "a" "a"
+natTy = Pi "a" ty $ ("a" ~> "a") ~> "a" ~> "a"
 
 zero = Lam "a" ty $ Lam "f" ("a" ~> "a") $ Lam "x" "a" "x"
 
