@@ -21,6 +21,8 @@ import Data.Semigroup
 import Lang.Common.Variable
 import Lang.Common.Unique
 
+import Control.Arrow
+
 import Control.Applicative
 
 newtype Name = N String
@@ -81,13 +83,13 @@ instance Substitutable Name Term Term where
       | x == y && i == 0 = rep
       | otherwise = V y i
     substitute x rep (Lam y ty t)
-      | x == y = Lam y ty $ incrVar y $ substitute x rep' (decrVar y t)
+      | x == y = Lam y ty $ incrVar y $ substitute x rep (decrVar y t)
       | otherwise = Lam y ty $ substitute x rep' t
-        where rep' = incrVar x rep
+        where rep' = incrVar y rep
     substitute x rep (Pi y ty t)
-      | x == y = Pi y ty $ incrVar y $ substitute x rep' (decrVar y t)
+      | x == y = Pi y ty $ incrVar y $ substitute x rep (decrVar y t)
       | otherwise = Pi y ty $ substitute x rep' t
-        where rep' = incrVar x rep
+        where rep' = incrVar y rep
     substitute x rep t = over plate (substitute x rep) t
 
 type Env = [(Name, Term)]
@@ -119,6 +121,8 @@ substitute' = ((nf.).) . substitute
 typeOf' :: Env -> Term -> Either String Term
 typeOf' = ((>>= nf) .) .  typeOf
 
+-- I don't think I make any effort to resove variables based on the environment
+-- or ensure that they are well formed; this needs to change
 typeOf :: Env -> Term -> Either String Term
 typeOf g Unit = Right UnitTy
 typeOf g T = Right Bool
@@ -137,20 +141,22 @@ typeOf g (IF p t e) = do
     pure t'
 typeOf g (App s t) = do
     s' <- typeOf' g s
-    t' <- typeOf' g t
     case s' of
         Pi x x' r' -> do
+            t' <- typeOf' g t
             assertEq x' t'
             substitute' x t r'
-        _ -> Left $ "type of " ++ show t ++ " was "
-                 ++ show t' ++ " but was expected to be a function type"
-typeOf g (Pi x x' e) = do
-    e' <- typeOf' (extendedWith (x, x') g) e
-    case (x', e') of
+        _ -> Left $ "type of " ++ show s ++ " was "
+                 ++ show s' ++ " but was expected to be a function type"
+typeOf g (Pi x x' r') = do
+    nfx' <- nf x'
+    r'' <- typeOf' (extendedWith (x, nfx') g) r'
+    x'' <- typeOf' g x'
+    case (x'', r'') of
         -- this may not be particualarly sound. See this for more details:
         -- https://cs.stackexchange.com/questions/13285/universes-in-dependent-type-theory
         (TypeUniverse i, TypeUniverse j) -> Right $ TypeUniverse $ max i j
-        _ -> Left $ "function function argument types and return types must be"
+        _ -> Left $ "function argument types and return types must be"
                  ++ " types and cannot be values"
 typeOf g (Lam x x' e) = do
     x'' <- nf x'
