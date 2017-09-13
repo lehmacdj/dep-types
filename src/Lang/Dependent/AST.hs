@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module Lang.Dependent.AST where
 
@@ -78,6 +79,7 @@ instance VarContaining Term (Name, Int) where
     freeVars t = children t >>= freeVars
     allVars t = [(n, i) | V n i <- universe t]
 
+-- probably incorrect
 instance Substitutable Name Term Term where
     substitute x rep (V y i)
       | x == y && i == 0 = rep
@@ -86,13 +88,40 @@ instance Substitutable Name Term Term where
       | x == y = Lam y ty $ incrVar y $ substitute x rep (decrVar y t)
       | otherwise = Lam y ty $ substitute x rep' t
         where rep' = incrVar y rep
+              -- only incrVar when we don't substitute x
     substitute x rep (Pi y ty t)
       | x == y = Pi y ty $ incrVar y $ substitute x rep (decrVar y t)
       | otherwise = Pi y ty $ substitute x rep' t
         where rep' = incrVar y rep
+              -- only incrVar when we don't substitute x
     substitute x rep t = over plate (substitute x rep) t
 
 type Env = [(Name, Term)]
+
+-- failable applicative with an environent of type `g`
+data TyCheck g e a = Failed e | Checked g a
+  deriving (Functor)
+
+instance (Monoid e, Monoid g) => Applicative (TyCheck g e) where
+  pure = Checked mempty
+  Checked g f <*> Checked h x = Checked (g `mappend` h) (f x)
+  Failed e1 <*> Failed e2 = Failed (e1 `mappend` e2)
+  Failed e <*> Checked g x = Failed e
+  Checked g f <*> Failed e = Failed e
+
+instance (Monoid e, Monoid g) => Monad (TyCheck g e) where
+  return = pure
+  Checked g x >>= f = case f x of
+    Checked h x' -> Checked (g `mappend` h) x'
+    Failed e -> Failed e
+  Failed e >>= f = Failed e
+
+data TyErr = NotInEnv Name
+           | NotEqual Term Term
+           | MustBeFunction Term
+           | MustBeTypeUniverse Term
+
+type TyChecking = TyCheck Env [TyErr]
 
 getFromEnvSkip :: Env -> Name -> Int -> Either String Term
 getFromEnvSkip [] x 0 = Left $ show x ++ " is not present in the type environment"
@@ -187,7 +216,7 @@ nf (App f a) = do
     case f' of
         Lam x x' e -> nf $ substitute x a e
         Absurd ty -> Left "trying to evaluate an expression that uses Absurd?"
-        _ -> Left "invalid function application"
+        _ -> Left $ "invalid function application of " ++ show f
 nf (Lam x x' e) = do
     x'' <- nf x'
     e' <- nf e
@@ -204,5 +233,5 @@ whnf (App f a) = do
     case f' of
         Lam x x' e -> whnf $ substitute x a e
         Absurd ty -> Left "trying to evaluate an expression that uses Absurd?"
-        _ -> Left "invalid function application"
+        _ -> Left $ "invalid function application of " ++ show f
 whnf t = pure t
