@@ -26,8 +26,11 @@ import Control.Arrow
 
 import Control.Applicative
 
-newtype Name = N String
-  deriving (Eq, Show, Read, Data, Typeable, Uniquable)
+newtype Name = N { name :: String }
+  deriving (Eq, Data, Typeable, Uniquable)
+
+instance Show Name where
+  show x = "(N " ++ name x ++ ")"
 
 instance IsString Name where
   fromString = N
@@ -142,7 +145,7 @@ extendedWith = (:)
 assertEq :: Term -> Term -> Either String ()
 assertEq s t
   | s == t = pure ()
-  | otherwise = Left $ "term " ++ show s ++ " is not equal to " ++ show t
+  | otherwise = Left $ "term " ++ pretty s ++ " is not equal to " ++ pretty t
 
 substitute' :: Name -> Term -> Term -> Either String Term
 substitute' = ((nf.).) . substitute
@@ -210,14 +213,14 @@ nf (IF p t e) = do
     case p' of
         T -> nf t
         F -> nf e
-        _ -> Left $ "invalid argument " ++ show p ++ " to boolean destructor"
+        _ -> Left $ "invalid argument " ++ pretty p ++ " to boolean destructor"
 nf (App f a) = do
     f' <- whnf f
     case f' of
         Lam x x' e -> nf $ substitute x a e
         V x i -> pure $ App f a
         Absurd ty -> Left "trying to evaluate an expression that uses Absurd?"
-        _ -> Left $ "invalid function application of " ++ show f
+        _ -> Left $ "invalid function application of " ++ pretty f
 nf (Lam x x' e) = do
     x'' <- nf x'
     e' <- nf e
@@ -235,5 +238,34 @@ whnf (App f a) = do
         Lam x x' e -> whnf $ substitute x a e
         V x i -> pure $ App f a
         Absurd ty -> Left "trying to evaluate an expression that uses Absurd?"
-        _ -> Left $ "invalid function application of " ++ show f
+        _ -> Left $ "invalid function application of " ++ pretty f
 whnf t = pure t
+
+pretty :: Term -> String
+pretty Unit = "*"
+pretty T = "true"
+pretty F = "false"
+pretty Void = "⊥"
+pretty (Absurd t) = "(absurd " ++ pretty t ++ ")"
+pretty UnitTy = "unit"
+pretty Bool = "2"
+pretty (TypeUniverse n)
+  | n == 0 = "T"
+  | otherwise = "T_" ++ show n
+pretty (IF p t e) = "(if " ++ pretty p ++ " " ++ pretty t ++ " " ++ pretty e ++ ")"
+pretty (App e1 e2) = "(" ++ pretty e1 ++ " " ++ pretty e2 ++ ")"
+pretty (Lam x x' e) = "(λ" ++ name x ++ ":" ++ pretty x' ++ "." ++ pretty e ++ ")"
+pretty (Pi x x' e)
+  | name x == "_" = "(" ++ pretty x' ++ " -> " ++ pretty e ++ ")"
+  | otherwise = "(∀" ++ name x ++ ":" ++ pretty x' ++ "." ++ pretty e ++ ")"
+pretty (V x i)
+  | i == 0 = name x
+  | otherwise = name x ++ "_" ++ show i
+
+class PP a where
+  pp :: a -> IO ()
+instance PP (Either String Term) where
+  pp (Right t) = putStrLn $ pretty t
+  pp (Left s) = putStrLn s
+instance PP Term where
+  pp t = putStrLn $ pretty t
