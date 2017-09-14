@@ -43,7 +43,30 @@ data Term = V Name Int
           | Unit | UnitTy
           | T | F | Bool | IF Term Term Term
           | TypeUniverse Natural
-          deriving (Eq, Show, Read, Data, Typeable)
+          deriving (Eq, Show, Data, Typeable)
+
+newtype Alpha = Alpha Term
+  deriving (Show, Data, Typeable)
+
+instance Eq Alpha where
+  (Alpha a) == (Alpha b) = alphaNormal a == alphaNormal b
+
+type Alphafy a = Unique Name a
+
+-- not quite, we don't update the binding sites in the term but everything else
+-- gets updated properly, not quite sure how difficult it will be to update the
+-- bound variables as well
+alphaNormal :: Term -> Term
+alphaNormal t = composed uniquesubs t
+  where uniquesubs = runUnique
+          (mapM (\v -> (fresh :: Unique Name Name) >>= pure . mkSubst v) vars)
+          []
+        composed :: [a -> a] -> a -> a
+        composed = foldl (.) id
+        vars :: [(Name, Int)]
+        vars = allVars t
+        mkSubst :: (Name, Int) -> Name -> Term -> Term
+        mkSubst v f = substitute v (V f 0)
 
 instance Plated Term
 
@@ -74,13 +97,11 @@ incrVar :: Name -> Term -> Term
 incrVar = mapVarIndex succ
 
 instance VarContaining Term (Name, Int) where
-    freeVars (V n i)
-      | i >= 0 = [(n, i)]
-      | otherwise = []
-    freeVars (Lam n ty t) = overName n succ $ freeVars (decrVar n t)
-    freeVars (Pi n ty t) = overName n succ $ freeVars (decrVar n t)
-    freeVars t = children t >>= freeVars
-    allVars t = [(n, i) | V n i <- universe t]
+    allVars (V n i) = [(n, i)]
+    allVars (Lam n ty t) = allVars (decrVar n t)
+    allVars (Pi n ty t) = allVars (decrVar n t)
+    allVars t = children t >>= allVars
+    freeVars = filter ((>= 0) . snd) . allVars
 
 instance Substitutable (Name, Int) Term Term where
     substitute (x, i) rep (V y j)
@@ -178,8 +199,8 @@ typeOf g (App s t) = do
             t' <- typeOf' g t
             assertEq x' t'
             substitute' x t r'
-        _ -> Left $ "type of " ++ show s ++ " was "
-                 ++ show s' ++ " but was expected to be a function type"
+        _ -> Left $ "type of " ++ pretty s ++ " was "
+                 ++ pretty s' ++ " but was expected to be a function type"
 typeOf g (Pi x x' r') = do
     nfx' <- nf x'
     r'' <- typeOf' (extendedWith (x, nfx') g) r'
