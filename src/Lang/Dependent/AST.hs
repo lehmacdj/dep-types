@@ -79,22 +79,22 @@ instance VarContaining Term (Name, Int) where
     freeVars t = children t >>= freeVars
     allVars t = [(n, i) | V n i <- universe t]
 
--- probably incorrect
-instance Substitutable Name Term Term where
-    substitute x rep (V y i)
-      | x == y && i == 0 = rep
-      | otherwise = V y i
-    substitute x rep (Lam y ty t)
-      | x == y = Lam y ty $ incrVar y $ substitute x rep (decrVar y t)
-      | otherwise = Lam y ty $ substitute x rep' t
+instance Substitutable (Name, Int) Term Term where
+    substitute (x, i) rep (V y j)
+      | x == y && i == j = rep
+      | otherwise = V y j
+    substitute (x, i) rep (Lam y ty t)
+      | x == y = Lam y ty $ substitute (x, i + 1) rep t
+      | otherwise = Lam y ty $ substitute (x, i) rep' t
         where rep' = incrVar y rep
-              -- only incrVar when we don't substitute x
-    substitute x rep (Pi y ty t)
-      | x == y = Pi y ty $ incrVar y $ substitute x rep (decrVar y t)
-      | otherwise = Pi y ty $ substitute x rep' t
+    substitute (x, i) rep (Pi y ty t)
+      | x == y = Pi y ty $ substitute (x, i + 1) rep t
+      | otherwise = Pi y ty $ substitute (x, i) rep' t
         where rep' = incrVar y rep
-              -- only incrVar when we don't substitute x
     substitute x rep t = over plate (substitute x rep) t
+
+instance Substitutable Name Term Term where
+  substitute x = substitute (x , 0 :: Int)
 
 type Env = [(Name, Term)]
 
