@@ -51,8 +51,6 @@ newtype Alpha = Alpha Term
 instance Eq Alpha where
   (Alpha a) == (Alpha b) = alphaNormal a == alphaNormal b
 
-type Alphafy a = Unique Name a
-
 -- not quite, we don't update the binding sites in the term but everything else
 -- gets updated properly, not quite sure how difficult it will be to update the
 -- bound variables as well
