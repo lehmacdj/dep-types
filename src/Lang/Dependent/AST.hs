@@ -55,8 +55,8 @@ instance Eq Alpha where
 -- gets updated properly, not quite sure how difficult it will be to update the
 -- bound variables as well
 alphaNormal :: Term -> Term
-alphaNormal t = composed uniquesubs t
-  where uniquesubs = runUnique
+alphaNormal t = composed uniqueSubs t
+  where uniqueSubs = runUnique
           (mapM (\v -> (fresh :: Unique Name Name) >>= pure . mkSubst v) vars)
           []
         composed :: [a -> a] -> a -> a
