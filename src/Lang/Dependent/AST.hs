@@ -215,6 +215,7 @@ nf (App f a) = do
     f' <- whnf f
     case f' of
         Lam x x' e -> nf $ substitute x a e
+        V x i -> pure $ App f a
         Absurd ty -> Left "trying to evaluate an expression that uses Absurd?"
         _ -> Left $ "invalid function application of " ++ show f
 nf (Lam x x' e) = do
@@ -232,6 +233,7 @@ whnf (App f a) = do
     f' <- whnf f
     case f' of
         Lam x x' e -> whnf $ substitute x a e
+        V x i -> pure $ App f a
         Absurd ty -> Left "trying to evaluate an expression that uses Absurd?"
         _ -> Left $ "invalid function application of " ++ show f
 whnf t = pure t
