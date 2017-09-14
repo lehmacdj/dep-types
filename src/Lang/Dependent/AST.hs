@@ -84,11 +84,11 @@ instance Substitutable (Name, Int) Term Term where
       | x == y && i == j = rep
       | otherwise = V y j
     substitute (x, i) rep (Lam y ty t)
-      | x == y = Lam y ty $ substitute (x, i + 1) rep t
+      | x == y = Lam y ty $ substitute (x, i + 1) rep' t
       | otherwise = Lam y ty $ substitute (x, i) rep' t
         where rep' = incrVar y rep
     substitute (x, i) rep (Pi y ty t)
-      | x == y = Pi y ty $ substitute (x, i + 1) rep t
+      | x == y = Pi y ty $ substitute (x, i + 1) rep' t
       | otherwise = Pi y ty $ substitute (x, i) rep' t
         where rep' = incrVar y rep
     substitute x rep t = over plate (substitute x rep) t
