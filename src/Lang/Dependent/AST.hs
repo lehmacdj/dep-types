@@ -42,11 +42,21 @@ data Term = V Name Int
           | TypeUniverse Natural
           deriving (Eq, Show, Data, Typeable)
 
+-- newtype wrapper for alpha equality
 newtype Alpha = Alpha Term
   deriving (Show, Data, Typeable)
 
 instance Eq Alpha where
   (Alpha a) == (Alpha b) = alphaNormal a == alphaNormal b
+
+-- newtype wrapper for beta equality
+newtype Beta = Beta Term
+  deriving (Show, Data, Typeable)
+
+instance Eq Beta where
+  (Beta a) == (Beta b) = case (nf a, nf b) of
+    (Right a, Right b) -> Alpha a == Alpha b
+    _ -> False
 
 alphaNormal :: Term -> Term
 alphaNormal t = composed subs rebound
