@@ -101,9 +101,6 @@ rebindBound (Pi x x' e) = do
     where subst f = substitute ((x, 0) :: (Name, Int)) (V f 0)
 rebindBound t = mapMOf plate rebindBound t
 
-overBound :: Term -> Unique Name Term
-overBound = undefined
-
 overName :: Name -> (a -> a) -> [(Name, a)] -> [(Name, a)]
 overName n = over (mapped . filtered ((==n) . fst) . _2)
 
