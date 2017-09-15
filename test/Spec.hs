@@ -45,10 +45,9 @@ instance Arbitrary Term where
 aterm :: Int -> Gen Term
 aterm 0 = oneof
     [ V <$> aname <*> (mod <$> arbitrary <*> pure 3)
-    , pure Unit , pure UnitTy
-    , pure T, pure F, pure Bool
     , TypeUniverse <$> arbitrary ]
-aterm n = oneof [ liftA3 Lam aname t t , liftA3 Pi aname t t , liftA3 IF t t t , liftA2 App t t ] where t = aterm (n `div` 2)
+aterm n = oneof [ liftA3 Lam aname t t , liftA3 Pi aname t t , liftA2 App t t ]
+    where t = aterm (n `div` 2)
 
 newtype WellTyped = WellTyped Term
 
