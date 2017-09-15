@@ -13,7 +13,6 @@ import Control.Monad.Reader
 
 import Control.Lens
 import Control.Lens.Plated
-import Data.List ((\\))
 import Data.Data hiding (typeOf)
 import Data.String (fromString, IsString)
 
@@ -23,6 +22,9 @@ import Lang.Common.Variable
 import Lang.Common.Unique
 
 import Control.Arrow
+
+import Data.List (sortBy)
+import Data.Function (on)
 
 import Control.Applicative
 
@@ -118,6 +120,15 @@ decrVar = mapVarIndex pred
 incrVar :: Name -> Term -> Term
 incrVar = mapVarIndex succ
 
+incrFree :: Name -> Term -> Term
+incrFree x t = composed substs t
+  where
+    composed = foldl (.) id
+    substs = zipWith substitute ordered incremented
+    incremented = map (\(x, i) -> V x (i + 1)) ordered
+    ordered = sortBy (compare `on` snd) vars
+    vars = filter ((==x) . fst) (freeVars t :: [(Name, Int)])
+
 instance VarContaining Term (Name, Int) where
     allVars (V n i) = [(n, i)]
     allVars (Lam n ty t) = allVars (decrVar n t)
@@ -132,11 +143,11 @@ instance Substitutable (Name, Int) Term Term where
     substitute (x, i) rep (Lam y ty t)
       | x == y = Lam y ty $ substitute (x, i + 1) rep' t
       | otherwise = Lam y ty $ substitute (x, i) rep' t
-        where rep' = incrVar y rep
+        where rep' = incrFree y rep
     substitute (x, i) rep (Pi y ty t)
       | x == y = Pi y ty $ substitute (x, i + 1) rep' t
       | otherwise = Pi y ty $ substitute (x, i) rep' t
-        where rep' = incrVar y rep
+        where rep' = incrFree y rep
     substitute x rep t = over plate (substitute x rep) t
 
 instance Substitutable Name Term Term where
