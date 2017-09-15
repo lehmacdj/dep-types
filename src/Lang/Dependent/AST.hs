@@ -180,7 +180,7 @@ extendedWith = (:)
 -- assert that two terms are equal, for example: during type checking
 assertEq :: Term -> Term -> Either String ()
 assertEq s t
-  | s == t = pure ()
+  | Alpha s == Alpha t = pure ()
   | otherwise = Left $ "term " ++ pretty s ++ " is not equal to " ++ pretty t
 
 substitute' :: Name -> Term -> Term -> Either String Term
