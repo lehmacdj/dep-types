@@ -51,18 +51,20 @@ newtype Alpha = Alpha Term
 instance Eq Alpha where
   (Alpha a) == (Alpha b) = alphaNormal a == alphaNormal b
 
--- not quite, we don't update the binding sites in the term but everything else
--- gets updated properly, not quite sure how difficult it will be to update the
--- bound variables as well
 alphaNormal :: Term -> Term
-alphaNormal t = composed uniqueSubs t
-  where uniqueSubs = runUnique
-          (mapM (\v -> (fresh :: Unique Name Name) >>= pure . mkSubst v) vars)
-          []
+alphaNormal t = composed subs rebound
+  where uniqueSubs =
+          mapM (\v -> (fresh :: Unique Name Name) >>= pure . mkSubst v) vars
+        sequenced :: Unique Name ([Term -> Term], Term)
+        sequenced = do
+          u' <- uniqueSubs
+          r' <- rebindBound t
+          pure (u', r')
+        (subs, rebound) = runUnique sequenced []
         composed :: [a -> a] -> a -> a
         composed = foldl (.) id
         vars :: [(Name, Int)]
-        vars = allVars t
+        vars = freeVars t
         mkSubst :: (Name, Int) -> Name -> Term -> Term
         mkSubst v f = substitute v (V f 0)
 
@@ -74,6 +76,21 @@ instance IsString Term where
 instance VarContaining Term Name where
     freeVars t = fst <$> (freeVars t :: [(Name, Int)])
     allVars t = fst <$> (allVars t :: [(Name, Int)])
+
+rebindBound :: Term -> Unique Name Term
+rebindBound (Lam x x' e) = do
+  f <- fresh
+  f' <- rebindBound (subst f x')
+  e' <- rebindBound (subst f e)
+  pure (Lam f f' e')
+    where subst f = substitute ((x, 0) :: (Name, Int)) (V f 0)
+rebindBound (Pi x x' e) = do
+  f <- fresh
+  f' <- rebindBound (subst f x')
+  e' <- rebindBound (subst f e)
+  pure (Pi f f' e')
+    where subst f = substitute ((x, 0) :: (Name, Int)) (V f 0)
+rebindBound t = mapMOf plate rebindBound t
 
 overBound :: Term -> Unique Name Term
 overBound = undefined
