@@ -39,9 +39,6 @@ data Term = V Name Int
           | Lam Name Term Term
           | Pi Name Term Term
           | App Term Term
-          | Void | Absurd Term
-          | Unit | UnitTy
-          | T | F | Bool | IF Term Term Term
           | TypeUniverse Natural
           deriving (Eq, Show, Data, Typeable)
 
@@ -192,21 +189,7 @@ typeOf' = ((>>= nf) .) .  typeOf
 -- I don't think I make any effort to resove variables based on the environment
 -- or ensure that they are well formed; this needs to change
 typeOf :: Env -> Term -> Either String Term
-typeOf g Unit = Right UnitTy
-typeOf g T = Right Bool
-typeOf g F = Right Bool
-typeOf g Void = Right $ TypeUniverse 0
-typeOf g (Absurd ty) = Right $ Pi "x" Void ty
-typeOf g UnitTy = Right $ TypeUniverse 0
-typeOf g Bool = Right $ TypeUniverse 0
 typeOf g (TypeUniverse n) = Right $ TypeUniverse $ n + 1
-typeOf g (IF p t e) = do
-    p' <- typeOf' g p
-    t' <- typeOf' g t
-    e' <- typeOf' g e
-    assertEq Bool p'
-    assertEq t' e'
-    pure t'
 typeOf g (App s t) = do
     s' <- typeOf' g s
     case s' of
@@ -236,26 +219,12 @@ typeCheck :: Term -> Either String Term
 typeCheck = typeOf []
 
 nf :: Term -> Either String Term
-nf Unit = pure Unit
-nf T = pure T
-nf F = pure F
-nf Void = pure Void
-nf (Absurd ty) = pure (Absurd ty)
-nf UnitTy = pure UnitTy
-nf Bool = pure Bool
 nf (TypeUniverse n) = pure $ TypeUniverse n
-nf (IF p t e) = do
-    p' <- nf p
-    case p' of
-        T -> nf t
-        F -> nf e
-        _ -> Left $ "invalid argument " ++ pretty p ++ " to boolean destructor"
 nf (App f a) = do
     f' <- whnf f
     case f' of
         Lam x x' e -> nf $ substitute x a e
         V x i -> pure $ App f a
-        Absurd ty -> Left "trying to evaluate an expression that uses Absurd?"
         _ -> Left $ "invalid function application of " ++ pretty f
 nf (Lam x x' e) = do
     x'' <- nf x'
@@ -273,22 +242,13 @@ whnf (App f a) = do
     case f' of
         Lam x x' e -> whnf $ substitute x a e
         V x i -> pure $ App f a
-        Absurd ty -> Left "trying to evaluate an expression that uses Absurd?"
         _ -> Left $ "invalid function application of " ++ pretty f
 whnf t = pure t
 
 pretty :: Term -> String
-pretty Unit = "*"
-pretty T = "true"
-pretty F = "false"
-pretty Void = "⊥"
-pretty (Absurd t) = "(absurd " ++ pretty t ++ ")"
-pretty UnitTy = "unit"
-pretty Bool = "2"
 pretty (TypeUniverse n)
   | n == 0 = "T"
   | otherwise = "T_" ++ show n
-pretty (IF p t e) = "(if " ++ pretty p ++ " " ++ pretty t ++ " " ++ pretty e ++ ")"
 pretty (App e1 e2) = "(" ++ pretty e1 ++ " " ++ pretty e2 ++ ")"
 pretty (Lam x x' e) = "(λ" ++ name x ++ ":" ++ pretty x' ++ "." ++ pretty e ++ ")"
 pretty (Pi x x' e)
