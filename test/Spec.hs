@@ -21,7 +21,7 @@ main = defaultMain tests
 
 tests = testGroup "tests"
     [ properties
-    , matchTests
+    , sumProdTests
     ]
 
 properties :: TestTree
@@ -61,10 +61,12 @@ instance Arbitrary Name where
 aname :: Gen Name
 aname = fromString <$> listOf1 (choose ('a', 'z'))
 
-matchTests :: TestTree
-matchTests = testGroup "Sum type tests"
+sumProdTests :: TestTree
+sumProdTests = testGroup "Sum type tests"
     [ testCase "match inl" $ nf matchNFL @=? Right true
     , testCase "match inr" $ nf matchNFR @=? Right true
+    , testCase "pi1 pair" $ nf pi1Pair @=? Right true
+    , testCase "pi2 pair" $ nf pi2Pair @=? Right false
     ]
 
 matchNFL = match @@ boolTy @@ boolTy @@ (inl @@ boolTy @@ boolTy @@ true)
@@ -72,3 +74,6 @@ matchNFL = match @@ boolTy @@ boolTy @@ (inl @@ boolTy @@ boolTy @@ true)
 
 matchNFR = match @@ boolTy @@ boolTy @@ (inr @@ boolTy @@ boolTy @@ true)
     @@ boolTy @@ Lam "x" boolTy false @@ Lam "x" boolTy true
+
+pi1Pair = pi1 @@ boolTy @@ boolTy @@ (pair @@ boolTy @@ boolTy @@ true @@ false)
+pi2Pair = pi2 @@ boolTy @@ boolTy @@ (pair @@ boolTy @@ boolTy @@ true @@ false)
