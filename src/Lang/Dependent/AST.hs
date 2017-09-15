@@ -195,32 +195,26 @@ extendedWith = (:)
 -- assert that two terms are equal, for example: during type checking
 assertEq :: Term -> Term -> Either String ()
 assertEq s t
-  | Alpha s == Alpha t = pure ()
+  | Beta s == Beta t = pure ()
   | otherwise = Left $ "term " ++ pretty s ++ " is not equal to " ++ pretty t
-
-substitute' :: Name -> Term -> Term -> Either String Term
-substitute' = ((nf.).) . substitute
-
-typeOf' :: Env -> Term -> Either String Term
-typeOf' = ((>>= nf) .) .  typeOf
 
 -- I don't think I make any effort to resove variables based on the environment
 -- or ensure that they are well formed; this needs to change
 typeOf :: Env -> Term -> Either String Term
 typeOf g (TypeUniverse n) = Right $ TypeUniverse $ n + 1
 typeOf g (App s t) = do
-    s' <- typeOf' g s
+    s' <- typeOf g s
     case s' of
         Pi x x' r' -> do
-            t' <- typeOf' g t
+            t' <- typeOf g t
             assertEq x' t'
-            substitute' x t r'
+            pure $ substitute x t r'
         _ -> Left $ "type of " ++ pretty s ++ " was "
                  ++ pretty s' ++ " but was expected to be a function type"
 typeOf g (Pi x x' r') = do
     nfx' <- nf x'
-    r'' <- typeOf' (extendedWith (x, nfx') g) r'
-    x'' <- typeOf' g x'
+    r'' <- typeOf (extendedWith (x, nfx') g) r'
+    x'' <- typeOf g x'
     case (x'', r'') of
         -- this may not be particualarly sound. See this for more details:
         -- https://cs.stackexchange.com/questions/13285/universes-in-dependent-type-theory
@@ -229,7 +223,7 @@ typeOf g (Pi x x' r') = do
                  ++ " types and cannot be values"
 typeOf g (Lam x x' e) = do
     x'' <- nf x'
-    e' <- typeOf' (extendedWith (x, x'') g) e
+    e' <- typeOf (extendedWith (x, x'') g) e
     Right $ Pi x x' e'
 typeOf g (V x n) = getFromEnvSkip g x n
 
